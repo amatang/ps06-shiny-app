@@ -18,3 +18,6 @@ The **Tables** tab presents a table of different countries and their averages. T
 
 ## Answer to Final Question
 I spent about 16 hours on this assignment.
+
+## Link 
+[World Happiness Report App](https://amatang.shinyapps.io/ps06-shiny-app-amatang/)
