@@ -1,0 +1,152 @@
+#
+# This is a Shiny web application. You can run the application by clicking
+# the 'Run App' button above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+library(shiny)
+library(tidyverse)
+library(colorspace)
+library(rsconnect)
+
+unclean1 <- read_delim("data/2019.csv")
+unclean2 <- read_delim("data/2018.csv")
+
+time2019 <- unclean1 %>% 
+  mutate(Year = rep("2019", length(156))) %>% 
+  relocate(Year, .after = `Overall rank`)
+
+time2018 <- unclean2 %>% 
+  mutate(Year = rep("2018", length(156))) %>% 
+  relocate(Year, .after = `Overall rank`)
+
+happy <- rbind(time2018, time2019)
+
+
+
+happy %>% 
+  group_by(`Country or region`) %>% 
+  summarize(Average = mean(Score))
+
+
+ui <- fluidPage(
+
+    titlePanel("World Happiness Report"),
+    
+    tabsetPanel(
+      tabPanel("About",
+               sidebarLayout(
+                 sidebarPanel(
+                   HTML("This app shows us the 2018-2019 happiness data across different
+                    <u>countries</u> and <u>regions</u>."),
+                   tags$br(),
+                   tags$br(),
+                   p("This data was collected by the", em("World Gallup Poll"), "."),
+                   p("The dataset was found on", strong("Kaggle"), "."),
+                   tags$hr(),
+                   tags$h4("Summary"),
+                   p("This dataset has", nrow(happy), "and", ncol(happy), "columns.")
+                 ),
+                 mainPanel(tags$br(),
+                           HTML("Here is a small (random) sample of 5 countries/regions:"),
+                           tableOutput("sampleTable"))
+               )),
+      tabPanel("Plots",
+               sidebarLayout(
+                 sidebarPanel(
+                   HTML("This scatterplot shows the relationship between
+                        <i>social support</i> and <i>happiness score</i> in 2019.
+                        You can modify the <i>random</i> sample size using the <b>slider</b>
+                        below. You may also change the color scheme using the 
+                        <b>color palette changer</b>. <br/> <br/>
+                        The plot will adjust accordingly to your input."),
+                   tags$hr(),
+                   tags$h4("Sample Size Slider"),
+                   sliderInput("n", "Choose a sample size:", 1, 156, 78),
+                   tags$hr(),
+                   tags$h4("Color Palette Changer"),
+                   radioButtons("colors", "Pick a color palette:",
+                                choices=c("Pastel 1", "Dark 2", "Set 3", "Warm", "Cold")),
+                   tags$hr(),
+                   tags$h4("Summary"),
+                   textOutput("text")
+                 ),
+                 mainPanel(tags$br(), 
+                           plotOutput("plot"))
+               )),
+      tabPanel("Tables",
+               sidebarLayout(
+                 sidebarPanel(
+                   HTML("This table shows the average of a given variable
+                   for each country. Select a <b><u> numerical attribute</u></b>
+                   you're interested in."),
+                   tags$hr(),
+                   tags$h4("Variable Selection"),
+                   selectInput("attribute", "Select an attribute:", 
+                              choice=c("Score", "GDP per capita", "Social support",
+                                       "Healthy life expectancy", "Freedom to make life choices",
+                                       "Generosity")),
+                   tags$hr(),
+                   tags$h4("Summary"),
+                   textOutput("text2")
+                 ),
+                 mainPanel(tags$br(),
+                           tableOutput("table"))
+               ))
+    )
+
+)
+
+server <- function(input, output) {
+  
+  sample <- reactive({
+    happy %>% 
+      filter(Year == "2019") %>% 
+      sample_n(input$n)
+  })
+  
+  table <- reactive({
+    happy %>% 
+      group_by(`Country or region`) %>% 
+      summarize(Average = mean(.data[[input$attribute]]))
+  })
+  
+  
+  output$sampleTable <- renderTable({
+    happy %>% 
+      sample_n(5)
+  })
+  
+  output$text <- renderText({
+    sample() %>% 
+      pull(Score) %>% 
+      max() %>% 
+      paste("The highest happiness score in this sample is", ., ".")
+      
+  })
+  
+  output$text2 <- renderText({
+    table() %>% 
+      filter(Average == max(Average)) %>% 
+      pull(`Country or region`) %>% 
+      paste(., "has the highest average.")
+  })
+
+  output$plot <- renderPlot({
+    sample() %>% 
+      ggplot(aes(`Social support`, Score, col=factor(`Country or region`))) + 
+      geom_point() + labs(title="Social Support and Happiness Score in 2019", x="Social Support",
+                          y="Happiness Score", col="Country and Region") + 
+      scale_color_discrete_qualitative(palette = input$colors)
+  })
+  
+  output$table <- renderTable({
+    table()
+  })
+    
+}
+
+shinyApp(ui = ui, server = server)
